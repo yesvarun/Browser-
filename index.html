@@ -3,534 +3,235 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reader — Browser with Reading Mode</title>
+<title>Reader Browser</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600&display=swap');
-
   :root {
-    --bg: #0f1117;
-    --surface: #181c26;
-    --border: #252a38;
-    --accent: #6c8ebf;
-    --accent-glow: rgba(108,142,191,0.18);
-    --text: #e8e2d6;
-    --muted: #8b8fa8;
-    --gold: #c9a84c;
-    --gold-glow: rgba(201,168,76,0.12);
-    --reader-bg: #13110e;
-    --reader-text: #e0d9cc;
-    --reader-width: 680px;
+    --bg:#0f1117; --surface:#181c26; --border:#252a38;
+    --accent:#6c8ebf; --text:#e8e2d6; --muted:#8b8fa8;
+    --gold:#c9a84c; --gold-glow:rgba(201,168,76,0.12);
+    --reader-bg:#13110e; --reader-text:#e0d9cc;
   }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* TOOLBAR */
+  #toolbar{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
+  .nav-btn{background:none;border:1px solid var(--border);color:var(--muted);width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+  .nav-btn:hover{background:var(--border);color:var(--text);}
+  #url-bar{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 14px;border-radius:20px;font-size:13px;font-family:'Inter',sans-serif;outline:none;transition:border-color .2s;}
+  #url-bar:focus{border-color:var(--accent);}
+  #go-btn{background:var(--accent);border:none;color:#fff;padding:6px 16px;border-radius:20px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;}
+  #go-btn:hover{opacity:.85;}
+  #reader-toggle{background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:20px;cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap;display:flex;align-items:center;gap:5px;transition:all .2s;}
+  #reader-toggle.active{border-color:var(--gold);color:var(--gold);background:var(--gold-glow);}
+  #reader-toggle:hover{border-color:var(--gold);color:var(--gold);}
 
-  body {
-    font-family: 'Inter', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
+  /* MAIN */
+  #main{flex:1;position:relative;overflow:hidden;}
+  #iframe-wrap{position:absolute;inset:0;}
+  #browser-frame{width:100%;height:100%;border:none;background:#fff;}
+  #overlay-msg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted);font-size:14px;text-align:center;pointer-events:none;}
+  #overlay-msg svg{opacity:.2;}
 
-  /* ── TOOLBAR ── */
-  #toolbar {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 10px 14px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
-    z-index: 10;
-  }
+  /* READER */
+  #reader-panel{position:absolute;inset:0;background:var(--reader-bg);display:none;overflow-y:auto;z-index:5;}
+  #reader-panel.visible{display:block;}
+  #reader-inner{max-width:680px;margin:0 auto;padding:48px 24px 80px;}
+  #reader-meta{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+  #reader-title{font-family:'Crimson Pro',Georgia,serif;font-size:clamp(26px,5vw,40px);font-weight:300;line-height:1.2;color:var(--reader-text);margin-bottom:24px;}
 
-  #nav-btns { display: flex; gap: 4px; }
+  /* AI CARD */
+  #ai-card{background:linear-gradient(135deg,rgba(108,142,191,.1),rgba(108,142,191,.03));border:1px solid rgba(108,142,191,.28);border-radius:14px;padding:20px 22px;margin-bottom:32px;position:relative;overflow:hidden;}
+  #ai-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),transparent);}
+  #ai-label{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+  .ai-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite;}
+  .ai-dot.done{animation:none;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  #ai-text{font-family:'Crimson Pro',Georgia,serif;font-size:17px;line-height:1.65;color:#bcc8dd;font-style:italic;min-height:22px;}
+  #summarise-btn{margin-top:13px;background:none;border:1px solid rgba(108,142,191,.35);color:var(--accent);padding:6px 16px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif;}
+  #summarise-btn:hover{background:rgba(108,142,191,.12);}
+  #summarise-btn:disabled{opacity:.4;cursor:not-allowed;}
 
-  .nav-btn {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    width: 32px; height: 32px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    display: flex; align-items: center; justify-content: center;
-    transition: all .15s;
-  }
-  .nav-btn:hover { background: var(--border); color: var(--text); }
+  /* CONTROLS BAR */
+  #reader-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:24px;padding-bottom:18px;border-bottom:1px solid rgba(255,255,255,.06);}
+  #word-count{font-size:11px;color:var(--muted);margin-left:auto;}
 
-  #url-bar {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 13px;
-    font-family: 'Inter', sans-serif;
-    outline: none;
-    transition: border-color .2s;
-  }
-  #url-bar:focus { border-color: var(--accent); }
+  /* TEXT SIZE MENU */
+  #ts-wrap{position:relative;}
+  #ts-btn{background:none;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:6px;transition:all .15s;white-space:nowrap;user-select:none;}
+  #ts-btn:hover,#ts-btn.open{border-color:var(--accent);color:var(--accent);}
+  #ts-menu{position:absolute;top:calc(100% + 8px);left:0;background:#1a1f2e;border:1px solid var(--border);border-radius:14px;padding:16px;z-index:200;width:240px;box-shadow:0 10px 40px rgba(0,0,0,.6);display:none;}
+  #ts-menu.open{display:block;}
 
-  #go-btn {
-    background: var(--accent);
-    border: none;
-    color: #fff;
-    padding: 7px 16px;
-    border-radius: 20px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    white-space: nowrap;
-    transition: opacity .15s;
-  }
-  #go-btn:hover { opacity: .85; }
+  .ts-section-label{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+  .ts-section{margin-bottom:14px;}
+  .ts-section:last-child{margin-bottom:0;}
 
-  #reader-toggle {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    padding: 6px 12px;
-    border-radius: 20px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
-    white-space: nowrap;
-    transition: all .2s;
-    display: flex; align-items: center; gap: 6px;
-  }
-  #reader-toggle.active {
-    border-color: var(--gold);
-    color: var(--gold);
-    background: var(--gold-glow);
-  }
-  #reader-toggle:hover { border-color: var(--gold); color: var(--gold); }
+  /* Presets */
+  .preset-row{display:flex;gap:5px;}
+  .preset-btn{flex:1;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 2px;border-radius:8px;cursor:pointer;font-size:11px;font-family:'Inter',sans-serif;transition:all .15s;text-align:center;}
+  .preset-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .preset-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
 
-  /* ── MAIN AREA ── */
-  #main {
-    flex: 1;
-    display: flex;
-    overflow: hidden;
-    position: relative;
-  }
+  /* Slider */
+  .slider-wrap{display:flex;align-items:center;gap:8px;margin-top:10px;}
+  .sz-a-small{font-size:10px;color:var(--muted);}
+  .sz-a-big{font-size:16px;color:var(--muted);}
+  #font-slider{flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:var(--border);outline:none;cursor:pointer;}
+  #font-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;}
+  #fs-display{font-size:11px;color:var(--accent);font-weight:600;min-width:30px;text-align:right;}
 
-  /* ── IFRAME ── */
-  #iframe-wrap {
-    flex: 1;
-    position: relative;
-    overflow: hidden;
-  }
-  #browser-frame {
-    width: 100%; height: 100%;
-    border: none;
-    background: #fff;
-    display: block;
-  }
-  #overlay-msg {
-    position: absolute; inset: 0;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 14px;
-    color: var(--muted);
-    font-size: 14px;
-    text-align: center;
-    pointer-events: none;
-  }
-  #overlay-msg svg { opacity: .25; }
+  /* Spacing buttons */
+  .opt-row{display:flex;gap:5px;}
+  .opt-btn{flex:1;background:none;border:1px solid var(--border);color:var(--muted);padding:5px 2px;border-radius:7px;cursor:pointer;font-size:10px;font-family:'Inter',sans-serif;transition:all .15s;text-align:center;}
+  .opt-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .opt-btn.active{background:rgba(108,142,191,.15);border-color:var(--accent);color:var(--accent);}
 
-  /* ── READER PANEL ── */
-  #reader-panel {
-    position: absolute; inset: 0;
-    background: var(--reader-bg);
-    display: none;
-    overflow-y: auto;
-    z-index: 5;
-  }
-  #reader-panel.visible { display: block; }
+  /* Font pick */
+  .font-row{display:flex;gap:5px;}
+  .font-pick{flex:1;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 2px;border-radius:7px;cursor:pointer;font-size:12px;transition:all .15s;text-align:center;}
+  .font-pick:hover{border-color:var(--accent);color:var(--accent);}
+  .font-pick.active{background:rgba(108,142,191,.15);border-color:var(--accent);color:var(--accent);}
+  .font-pick.serif{font-family:'Crimson Pro',serif;font-size:14px;}
+  .font-pick.sans{font-family:'Inter',sans-serif;}
+  .font-pick.mono{font-family:monospace;font-size:11px;}
 
-  #reader-inner {
-    max-width: var(--reader-width);
-    margin: 0 auto;
-    padding: 56px 28px 80px;
-  }
+  /* ARTICLE BODY */
+  #reader-body{font-family:'Crimson Pro',Georgia,serif;font-size:20px;line-height:1.78;color:#c8c0b4;font-weight:300;transition:font-size .2s,line-height .2s;}
+  #reader-body p{margin-bottom:1.3em;}
+  #reader-body h1,#reader-body h2,#reader-body h3{font-weight:600;color:var(--reader-text);margin:1.5em 0 .5em;line-height:1.25;}
+  #reader-body h2{font-size:1.35em;}
+  #reader-body h3{font-size:1.15em;}
+  #reader-body a{color:var(--accent);text-decoration:none;}
+  #reader-body a:hover{text-decoration:underline;}
+  #reader-body img{max-width:100%;border-radius:8px;margin:1em 0;}
+  #reader-body blockquote{border-left:3px solid var(--gold);padding-left:18px;color:#a09585;font-style:italic;margin:1.4em 0;}
+  #reader-body ul,#reader-body ol{margin-left:1.5em;margin-bottom:1.2em;}
+  #reader-body li{margin-bottom:.4em;}
 
-  #reader-meta {
-    font-family: 'Inter', sans-serif;
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 18px;
-  }
+  /* PROXY NOTE */
+  #proxy-note{background:rgba(201,168,76,.07);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:12px 16px;font-size:12px;color:#a08840;margin-bottom:18px;font-family:'Inter',sans-serif;line-height:1.6;display:none;}
 
-  #reader-title {
-    font-family: 'Crimson Pro', Georgia, serif;
-    font-size: clamp(28px, 5vw, 42px);
-    font-weight: 300;
-    line-height: 1.2;
-    color: var(--reader-text);
-    margin-bottom: 28px;
-    letter-spacing: -.01em;
-  }
+  /* STATUS */
+  #statusbar{background:var(--surface);border-top:1px solid var(--border);padding:4px 14px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  #statusbar .sep{opacity:.3;}
 
-  /* ── AI SUMMARY CARD ── */
-  #ai-summary-card {
-    background: linear-gradient(135deg, rgba(108,142,191,.1), rgba(108,142,191,.04));
-    border: 1px solid rgba(108,142,191,.3);
-    border-radius: 14px;
-    padding: 22px 26px;
-    margin-bottom: 40px;
-    position: relative;
-    overflow: hidden;
-  }
-  #ai-summary-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, var(--accent), transparent);
-  }
-
-  #ai-summary-label {
-    font-family: 'Inter', sans-serif;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: 12px;
-    display: flex; align-items: center; gap: 7px;
-  }
-  #ai-summary-label span.dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--accent);
-    animation: pulse 2s infinite;
-  }
-  @keyframes pulse {
-    0%,100% { opacity: 1; }
-    50% { opacity: .3; }
-  }
-  #ai-summary-label span.dot.done { animation: none; opacity: 1; }
-
-  #ai-summary-text {
-    font-family: 'Crimson Pro', Georgia, serif;
-    font-size: 17px;
-    line-height: 1.65;
-    color: #bcc8dd;
-    font-style: italic;
-    min-height: 24px;
-  }
-
-  #summarise-btn {
-    margin-top: 14px;
-    background: none;
-    border: 1px solid rgba(108,142,191,.35);
-    color: var(--accent);
-    padding: 7px 16px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all .2s;
-    font-family: 'Inter', sans-serif;
-  }
-  #summarise-btn:hover { background: rgba(108,142,191,.12); }
-  #summarise-btn:disabled { opacity: .4; cursor: not-allowed; }
-
-  /* ── ARTICLE BODY ── */
-  #reader-body {
-    font-family: 'Crimson Pro', Georgia, serif;
-    font-size: 20px;
-    line-height: 1.78;
-    color: #c8c0b4;
-    font-weight: 300;
-  }
-  #reader-body p { margin-bottom: 1.3em; }
-  #reader-body h1, #reader-body h2, #reader-body h3 {
-    font-weight: 600;
-    color: var(--reader-text);
-    margin: 1.6em 0 .6em;
-    font-family: 'Crimson Pro', serif;
-    line-height: 1.25;
-  }
-  #reader-body h2 { font-size: 1.4em; }
-  #reader-body h3 { font-size: 1.2em; }
-  #reader-body a { color: var(--accent); text-decoration: none; }
-  #reader-body a:hover { text-decoration: underline; }
-  #reader-body img { max-width: 100%; border-radius: 10px; margin: 1em 0; }
-  #reader-body blockquote {
-    border-left: 3px solid var(--gold);
-    padding-left: 20px;
-    color: #a09585;
-    font-style: italic;
-    margin: 1.5em 0;
-  }
-
-  /* ── STATUS BAR ── */
-  #statusbar {
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    padding: 5px 16px;
-    font-size: 11px;
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
-  }
-  #statusbar .sep { opacity: .3; }
-  #statusbar .badge {
-    background: var(--gold-glow);
-    border: 1px solid rgba(201,168,76,.3);
-    color: var(--gold);
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-  }
-
-  /* Loading spinner */
-  .spinner {
-    width: 14px; height: 14px;
-    border: 2px solid rgba(108,142,191,.2);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin .7s linear infinite;
-    display: inline-block;
-    vertical-align: middle;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* Scrollbar */
-  #reader-panel::-webkit-scrollbar { width: 5px; }
-  #reader-panel::-webkit-scrollbar-track { background: transparent; }
-  #reader-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-  #reader-controls {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    margin-bottom: 28px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid rgba(255,255,255,.06);
-  }
-
-  #word-count { font-size: 11px; color: var(--muted); font-family: 'Inter', sans-serif; flex: 1; }
-
-  /* ── TEXT SIZE MENU ── */
-  #text-size-wrap { position: relative; }
-
-  #text-size-btn {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    padding: 6px 13px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 12px;
-    font-family: 'Inter', sans-serif;
-    font-weight: 500;
-    display: flex; align-items: center; gap: 7px;
-    transition: all .15s;
-    white-space: nowrap;
-  }
-  #text-size-btn:hover, #text-size-btn.open {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: var(--accent-glow);
-  }
-  #text-size-btn svg { transition: transform .2s; }
-  #text-size-btn.open svg { transform: rotate(180deg); }
-
-  #text-size-menu {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    background: #1a1e2b;
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 16px 18px;
-    width: 230px;
-    box-shadow: 0 12px 40px rgba(0,0,0,.5);
-    z-index: 100;
-    display: none;
-  }
-  #text-size-menu.open { display: block; animation: menuIn .15s ease; }
-  @keyframes menuIn {
-    from { opacity: 0; transform: translateY(-6px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  .menu-label {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 12px;
-    font-family: 'Inter', sans-serif;
-  }
-
-  .size-presets {
-    display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap;
-  }
-  .size-preset {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    padding: 5px 10px;
-    border-radius: 20px;
-    cursor: pointer;
-    font-family: 'Inter', sans-serif;
-    font-size: 11px;
-    font-weight: 500;
-    transition: all .15s;
-    white-space: nowrap;
-  }
-  .size-preset:hover { border-color: var(--accent); color: var(--accent); }
-  .size-preset.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
-  }
-
-  .slider-row {
-    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
-  }
-  .slider-label { font-size: 12px; color: var(--muted); font-family: 'Inter', sans-serif; }
-
-  #font-slider {
-    flex: 1;
-    -webkit-appearance: none;
-    height: 3px;
-    background: var(--border);
-    border-radius: 2px;
-    outline: none;
-    cursor: pointer;
-  }
-  #font-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 16px; height: 16px;
-    border-radius: 50%;
-    background: var(--accent);
-    border: 2px solid #1a1e2b;
-    box-shadow: 0 0 0 2px var(--accent);
-    cursor: pointer;
-    transition: box-shadow .15s;
-  }
-  #font-slider::-webkit-slider-thumb:hover {
-    box-shadow: 0 0 0 4px rgba(108,142,191,.25);
-  }
-
-  #font-size-display {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--accent);
-    font-family: 'Inter', sans-serif;
-    min-width: 34px;
-    text-align: right;
-  }
-
-  .line-spacing-row {
-    display: flex; align-items: center; gap: 6px; margin-top: 14px;
-    padding-top: 14px;
-    border-top: 1px solid rgba(255,255,255,.06);
-  }
-  .line-spacing-row .menu-label { margin-bottom: 0; }
-  .ls-btn {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    width: 30px; height: 26px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    display: flex; align-items: center; justify-content: center;
-    transition: all .15s;
-    margin-left: auto;
-  }
-  .ls-btn:hover, .ls-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
-
-  /* Proxy note */
-  #proxy-note {
-    background: rgba(201,168,76,.08);
-    border: 1px solid rgba(201,168,76,.2);
-    border-radius: 10px;
-    padding: 14px 18px;
-    font-size: 12px;
-    color: #a08840;
-    margin-bottom: 20px;
-    font-family: 'Inter', sans-serif;
-    line-height: 1.6;
-    display: none;
-  }
+  .spinner{width:14px;height:14px;border:2px solid rgba(108,142,191,.2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #reader-panel::-webkit-scrollbar{width:4px;}
+  #reader-panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
 </style>
 </head>
 <body>
 
-<!-- TOOLBAR -->
 <div id="toolbar">
-  <div id="nav-btns">
-    <button class="nav-btn" id="back-btn" title="Back" onclick="goBack()">←</button>
-    <button class="nav-btn" id="fwd-btn" title="Forward" onclick="goFwd()">→</button>
-    <button class="nav-btn" id="refresh-btn" title="Reload" onclick="reload()">↺</button>
+  <div style="display:flex;gap:4px">
+    <button class="nav-btn" onclick="goBack()">&#8592;</button>
+    <button class="nav-btn" onclick="goFwd()">&#8594;</button>
+    <button class="nav-btn" onclick="reload()">&#8635;</button>
   </div>
-  <input id="url-bar" type="url" placeholder="Enter URL — e.g. https://en.wikipedia.org/wiki/Meditation" 
+  <input id="url-bar" type="url" placeholder="Enter URL — e.g. https://en.wikipedia.org/wiki/Meditation"
     onkeydown="if(event.key==='Enter') navigate()">
   <button id="go-btn" onclick="navigate()">Go</button>
-  <button id="reader-toggle" onclick="toggleReader()" title="Reading Mode">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+  <button id="reader-toggle" onclick="toggleReader()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
     </svg>
     Reader
   </button>
 </div>
 
-<!-- MAIN -->
 <div id="main">
-  <!-- IFRAME VIEW -->
   <div id="iframe-wrap">
     <div id="overlay-msg">
-      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#8b8fa8" stroke-width="1.2">
-        <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#8b8fa8" stroke-width="1.2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="2" y1="12" x2="22" y2="12"/>
         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
       </svg>
       <div>Enter a URL above and press <strong>Go</strong></div>
-      <div style="font-size:12px;opacity:.6">Then click <strong>Reader</strong> to activate reading mode + AI summary</div>
+      <div style="font-size:12px;opacity:.6">Then click <strong>Reader</strong> for reading mode + AI summary</div>
     </div>
     <iframe id="browser-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-      style="display:none" onload="onFrameLoad()"></iframe>
+      style="display:none;width:100%;height:100%;border:none" onload="onFrameLoad()"></iframe>
   </div>
 
-  <!-- READER PANEL -->
   <div id="reader-panel">
     <div id="reader-inner">
-      <div id="reader-meta" id="reader-meta"></div>
+      <div id="reader-meta"></div>
       <div id="reader-title"></div>
 
-      <!-- AI Summary Card -->
-      <div id="ai-summary-card">
-        <div id="ai-summary-label">
-          <span class="dot" id="ai-dot"></span>
+      <div id="ai-card">
+        <div id="ai-label">
+          <span class="ai-dot" id="ai-dot"></span>
           AI Summary
         </div>
-        <div id="ai-summary-text">Click "Summarise" to generate an AI summary of this article.</div>
-        <button id="summarise-btn" onclick="summarise()">✦ Summarise with AI</button>
+        <div id="ai-text">Click "Summarise" to generate an AI summary of this article.</div>
+        <button id="summarise-btn" onclick="summarise()">&#10022; Summarise with AI</button>
       </div>
 
-      <div id="proxy-note">
-        ⚠️ Some pages can't be fully extracted due to browser security rules. The reader shows the best available text. For richer extraction, open the page normally and paste the text using the paste option.
-      </div>
+      <div id="proxy-note">&#9888;&#65039; Some pages block external access. Try Wikipedia, blogs, or open news articles.</div>
 
-      <!-- Reader controls -->
       <div id="reader-controls">
-        <button class="font-btn" onclick="changeFontSize(-1)" title="Smaller text">A−</button>
-        <button class="font-btn" onclick="changeFontSize(1)" title="Larger text">A+</button>
+
+        <!-- TEXT SIZE MENU -->
+        <div id="ts-wrap">
+          <button id="ts-btn" onclick="toggleTsMenu(event)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="4 7 4 4 20 4 20 7"/>
+              <line x1="9" y1="20" x2="15" y2="20"/>
+              <line x1="12" y1="4" x2="12" y2="20"/>
+            </svg>
+            Text Size
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+
+          <div id="ts-menu">
+
+            <div class="ts-section">
+              <div class="ts-section-label">Size</div>
+              <div class="preset-row">
+                <button class="preset-btn" data-size="14" onclick="setPreset(14,this)">XS</button>
+                <button class="preset-btn" data-size="17" onclick="setPreset(17,this)">S</button>
+                <button class="preset-btn active" data-size="20" onclick="setPreset(20,this)">M</button>
+                <button class="preset-btn" data-size="24" onclick="setPreset(24,this)">L</button>
+                <button class="preset-btn" data-size="28" onclick="setPreset(28,this)">XL</button>
+                <button class="preset-btn" data-size="34" onclick="setPreset(34,this)">XXL</button>
+              </div>
+              <div class="slider-wrap">
+                <span class="sz-a-small">A</span>
+                <input type="range" id="font-slider" min="12" max="40" value="20" oninput="onSlider(this.value)">
+                <span class="sz-a-big">A</span>
+                <span id="fs-display">20px</span>
+              </div>
+            </div>
+
+            <div class="ts-section">
+              <div class="ts-section-label">Line Spacing</div>
+              <div class="opt-row">
+                <button class="opt-btn" onclick="setSpacing(1.5,this)">Tight</button>
+                <button class="opt-btn active" onclick="setSpacing(1.78,this)">Normal</button>
+                <button class="opt-btn" onclick="setSpacing(2.1,this)">Relaxed</button>
+                <button class="opt-btn" onclick="setSpacing(2.5,this)">Airy</button>
+              </div>
+            </div>
+
+            <div class="ts-section">
+              <div class="ts-section-label">Font</div>
+              <div class="font-row">
+                <button class="font-pick serif active" onclick="setFont('serif',this)">Serif</button>
+                <button class="font-pick sans" onclick="setFont('sans',this)">Sans</button>
+                <button class="font-pick mono" onclick="setFont('mono',this)">Mono</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
         <span id="word-count"></span>
       </div>
 
@@ -539,7 +240,6 @@
   </div>
 </div>
 
-<!-- STATUS BAR -->
 <div id="statusbar">
   <span id="status-text">Ready</span>
   <span class="sep">|</span>
@@ -547,311 +247,191 @@
 </div>
 
 <script>
-// ── STATE ──
-let currentUrl = '';
-let extractedText = '';
-let readerActive = false;
-let fontSize = 20;
-let history = [];
-let historyIdx = -1;
+var currentUrl='', extractedText='', readerActive=false;
+var fontSize=20, lineHeight=1.78, fontFam='serif';
+var history=[], historyIdx=-1, tsOpen=false;
 
-// ── NAVIGATION ──
 function navigate(url) {
   url = url || document.getElementById('url-bar').value.trim();
   if (!url) return;
-  if (!url.startsWith('http')) url = 'https://' + url;
-  
+  if (!url.match(/^https?:\/\//)) url = 'https://' + url;
   document.getElementById('url-bar').value = url;
   currentUrl = url;
-  
-  if (readerActive) {
-    loadReader(url);
-  } else {
-    loadIframe(url);
-  }
-
-  // history
-  history = history.slice(0, historyIdx + 1);
-  history.push(url);
-  historyIdx = history.length - 1;
+  history = history.slice(0, historyIdx+1);
+  history.push(url); historyIdx = history.length-1;
+  readerActive ? loadReader(url) : loadIframe(url);
 }
-
 function loadIframe(url) {
-  const frame = document.getElementById('browser-frame');
-  const overlay = document.getElementById('overlay-msg');
-  setStatus('Loading…');
-  frame.style.display = 'block';
-  overlay.style.display = 'none';
-  frame.src = url;
+  var f = document.getElementById('browser-frame');
+  document.getElementById('overlay-msg').style.display = 'none';
+  f.style.display = 'block'; f.src = url;
+  setStatus('Loading...');
 }
+function onFrameLoad() { setStatus('Loaded - ' + currentUrl); }
+function goBack() { if (historyIdx>0) { historyIdx--; navigate(history[historyIdx]); } }
+function goFwd() { if (historyIdx<history.length-1) { historyIdx++; navigate(history[historyIdx]); } }
+function reload() { if (currentUrl) navigate(currentUrl); }
 
-function onFrameLoad() {
-  setStatus('Loaded — ' + currentUrl);
-  extractedText = '';
-}
-
-function goBack() {
-  if (historyIdx > 0) { historyIdx--; navigate(history[historyIdx]); }
-}
-function goFwd() {
-  if (historyIdx < history.length - 1) { historyIdx++; navigate(history[historyIdx]); }
-}
-function reload() {
-  if (currentUrl) navigate(currentUrl);
-}
-
-// ── READER MODE ──
-async function toggleReader() {
+function toggleReader() {
   readerActive = !readerActive;
-  const toggle = document.getElementById('reader-toggle');
-  const panel = document.getElementById('reader-panel');
-  const statusMode = document.getElementById('status-mode');
-
+  var btn = document.getElementById('reader-toggle');
+  var panel = document.getElementById('reader-panel');
+  var bookSVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>';
   if (readerActive) {
-    toggle.classList.add('active');
-    toggle.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-    </svg> Exit Reader`;
+    btn.classList.add('active');
+    btn.innerHTML = bookSVG + ' Exit Reader';
     panel.classList.add('visible');
-    statusMode.textContent = '📖 Reader Mode';
-    if (currentUrl) {
-      await loadReader(currentUrl);
-    } else {
-      showReaderPlaceholder();
-    }
+    document.getElementById('status-mode').textContent = 'Reader';
+    currentUrl ? loadReader(currentUrl) : (document.getElementById('reader-title').textContent='Reader Mode', document.getElementById('reader-body').innerHTML='<p>Navigate to a URL first.</p>');
   } else {
-    toggle.classList.remove('active');
-    toggle.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-    </svg> Reader`;
+    btn.classList.remove('active');
+    btn.innerHTML = bookSVG + ' Reader';
     panel.classList.remove('visible');
-    statusMode.textContent = 'Normal';
+    document.getElementById('status-mode').textContent = 'Normal';
     resetSummary();
   }
 }
 
 async function loadReader(url) {
-  setStatus('Extracting article…');
-  document.getElementById('reader-title').textContent = '⟳ Fetching article…';
+  setStatus('Extracting article...');
+  document.getElementById('reader-title').textContent = 'Fetching...';
   document.getElementById('reader-body').innerHTML = '<div class="spinner"></div>';
   document.getElementById('reader-meta').textContent = '';
   document.getElementById('word-count').textContent = '';
   document.getElementById('proxy-note').style.display = 'none';
   resetSummary();
-
   try {
-    // Use allorigins proxy to bypass CORS
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const res = await fetch(proxyUrl);
-    const data = await res.json();
-    const html = data.contents;
-
-    if (!html) throw new Error('Empty response');
-
-    const parsed = parseArticle(html, url);
-    renderReader(parsed, url);
+    var r = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(url));
+    var d = await r.json();
+    if (!d.contents) throw new Error('empty');
+    renderReader(parseArticle(d.contents, url), url);
   } catch(e) {
-    // Fallback: try to read from iframe
     document.getElementById('proxy-note').style.display = 'block';
     document.getElementById('reader-title').textContent = 'Could not extract article';
-    document.getElementById('reader-body').innerHTML = `
-      <p>The page could not be fetched for reader mode. This can happen due to browser security policies.</p>
-      <p><strong>Tips:</strong></p>
-      <ul style="margin-left:1.5em;margin-top:.5em;line-height:2">
-        <li>Try a Wikipedia, blog, or news article URL</li>
-        <li>Some sites block external access</li>
-      </ul>`;
-    setStatus('Reader extraction failed');
+    document.getElementById('reader-body').innerHTML = '<p>This page blocked access. Try a Wikipedia or blog URL.</p>';
+    setStatus('Extraction failed');
   }
 }
 
 function parseArticle(html, url) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-
-  // Title
-  const title = (
-    doc.querySelector('h1')?.textContent ||
-    doc.querySelector('title')?.textContent ||
-    doc.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
-    'Untitled'
-  ).trim();
-
-  // Domain
-  let domain = '';
-  try { domain = new URL(url).hostname.replace('www.', ''); } catch(e) {}
-
-  // Remove junk
-  ['script','style','nav','footer','header','aside','form',
-   '.nav','.footer','.header','.sidebar','.menu','.ad','.advertisement',
-   '#nav','#footer','#header','#sidebar'].forEach(sel => {
-    doc.querySelectorAll(sel).forEach(el => el.remove());
+  var doc = new DOMParser().parseFromString(html, 'text/html');
+  var title = (doc.querySelector('h1') || doc.querySelector('title') || {textContent:'Untitled'}).textContent.trim();
+  var domain = '';
+  try { domain = new URL(url).hostname.replace('www.',''); } catch(e){}
+  ['script','style','nav','footer','header','aside','form','.nav','.footer','.sidebar','.menu','.ad','#nav','#footer','#header','#sidebar'].forEach(function(s){
+    doc.querySelectorAll(s).forEach(function(el){el.remove();});
   });
-
-  // Find main content
-  const candidates = [
-    doc.querySelector('article'),
-    doc.querySelector('[role="main"]'),
-    doc.querySelector('main'),
-    doc.querySelector('.post-content'),
-    doc.querySelector('.article-body'),
-    doc.querySelector('.entry-content'),
-    doc.querySelector('.content'),
-    doc.querySelector('#content'),
-    doc.querySelector('.story-body'),
-    doc.querySelector('#mw-content-text'), // Wikipedia
-    doc.body
-  ].filter(Boolean);
-
-  const content = candidates[0];
-
-  // Clean up content
-  content.querySelectorAll('img').forEach(img => {
-    const src = img.getAttribute('src') || '';
-    if (src.startsWith('//')) img.src = 'https:' + src;
-    else if (src.startsWith('/')) {
-      try { img.src = new URL(url).origin + src; } catch(e) {}
-    }
+  var content = doc.querySelector('article') || doc.querySelector('[role="main"]') || doc.querySelector('main') || doc.querySelector('.post-content') || doc.querySelector('.entry-content') || doc.querySelector('#mw-content-text') || doc.body;
+  content.querySelectorAll('img').forEach(function(img){
+    var src = img.getAttribute('src')||'';
+    if (src.startsWith('//')) img.src='https:'+src;
+    else if (src.startsWith('/')) try{img.src=new URL(url).origin+src;}catch(e){}
   });
-  content.querySelectorAll('a').forEach(a => {
-    const href = a.getAttribute('href') || '';
-    if (href.startsWith('/')) {
-      try { a.href = new URL(url).origin + href; } catch(e) {}
-    }
-    a.target = '_blank';
-    a.rel = 'noopener';
+  content.querySelectorAll('a').forEach(function(a){
+    var h=a.getAttribute('href')||'';
+    if(h.startsWith('/')) try{a.href=new URL(url).origin+h;}catch(e){}
+    a.target='_blank'; a.rel='noopener';
   });
-
-  // Remove figure captions clutter, tables
-  content.querySelectorAll('table.navbox, .mw-editsection, .reference, .reflist, .toc').forEach(el => el.remove());
-
-  const bodyHTML = content.innerHTML;
-  const bodyText = content.textContent.replace(/\s+/g, ' ').trim();
-
-  return { title, domain, bodyHTML, bodyText };
+  content.querySelectorAll('table.navbox,.mw-editsection,.reference,.reflist,.toc').forEach(function(el){el.remove();});
+  return {title:title, domain:domain, bodyHTML:content.innerHTML, bodyText:content.textContent.replace(/\s+/g,' ').trim()};
 }
 
-function renderReader({ title, domain, bodyHTML, bodyText }, url) {
-  document.getElementById('reader-meta').textContent = domain + ' · ' + new Date().toLocaleDateString('en-IN', { day:'numeric', month:'long', year:'numeric' });
-  document.getElementById('reader-title').textContent = title;
-  document.getElementById('reader-body').innerHTML = bodyHTML;
-
-  const words = bodyText.split(/\s+/).filter(Boolean).length;
-  const mins = Math.ceil(words / 220);
-  document.getElementById('word-count').textContent = `${words.toLocaleString()} words · ${mins} min read`;
-
-  extractedText = bodyText.slice(0, 8000); // for AI
-  setStatus(`Reader mode — ${domain}`);
-  applyFontSize();
+function renderReader(parsed, url) {
+  document.getElementById('reader-meta').textContent = parsed.domain + ' · ' + new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('reader-title').textContent = parsed.title;
+  document.getElementById('reader-body').innerHTML = parsed.bodyHTML;
+  var words = parsed.bodyText.split(/\s+/).filter(Boolean).length;
+  document.getElementById('word-count').textContent = words.toLocaleString() + ' words · ' + Math.ceil(words/220) + ' min read';
+  extractedText = parsed.bodyText.slice(0,8000);
+  setStatus('Reader - ' + parsed.domain);
+  applyBodyStyle();
 }
 
-function showReaderPlaceholder() {
-  document.getElementById('reader-title').textContent = 'Reader Mode';
-  document.getElementById('reader-body').innerHTML = '<p>Navigate to a URL to activate reading mode.</p>';
-  document.getElementById('reader-meta').textContent = '';
-}
-
-// ── AI SUMMARISE ──
 async function summarise() {
-  if (!extractedText) {
-    document.getElementById('ai-summary-text').textContent = 'No article content found to summarise.';
-    return;
-  }
-
-  const btn = document.getElementById('summarise-btn');
-  const dot = document.getElementById('ai-dot');
-  const summaryEl = document.getElementById('ai-summary-text');
-
-  btn.disabled = true;
-  btn.textContent = '⟳ Summarising…';
-  dot.classList.remove('done');
-  summaryEl.textContent = '';
-
-  // Typewriter effect for streaming feel
-  let dots = 0;
-  const thinkInterval = setInterval(() => {
-    summaryEl.textContent = 'Thinking' + '.'.repeat(++dots % 4);
-  }, 400);
-
+  if (!extractedText) { document.getElementById('ai-text').textContent='No article loaded.'; return; }
+  var btn=document.getElementById('summarise-btn'), dot=document.getElementById('ai-dot'), el=document.getElementById('ai-text');
+  btn.disabled=true; btn.textContent='Summarising...'; dot.classList.remove('done'); el.textContent='';
+  var dots=0, t=setInterval(function(){el.textContent='Thinking'+'.'.repeat(++dots%4);},400);
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        system: `You are a precise article summariser. Summarise the article in 3–5 clear, flowing sentences. 
-Capture the main thesis, key points, and conclusion. 
-Write in plain English, no bullet points, no headings. 
-Be specific — name real facts, figures, or findings from the article. Start directly.`,
-        messages: [{ role: 'user', content: `Summarise this article:\n\n${extractedText}` }]
+    var res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-6', max_tokens:1000,
+        system:'Summarise the article in 3-5 clear sentences. Capture main thesis, key points, conclusion. Plain English, no bullets. Be specific. Start directly.',
+        messages:[{role:'user',content:'Summarise:\n\n'+extractedText}]
       })
     });
-
-    clearInterval(thinkInterval);
-    const data = await response.json();
-
-    if (data.error) throw new Error(data.error.message);
-
-    const summary = data.content?.[0]?.text || 'Could not generate summary.';
-    typewriter(summaryEl, summary);
-    dot.classList.add('done');
-    btn.textContent = '✦ Re-summarise';
-    btn.disabled = false;
+    clearInterval(t);
+    var data=await res.json();
+    if(data.error) throw new Error(data.error.message);
+    var summary=data.content&&data.content[0]&&data.content[0].text||'No summary returned.';
+    typewriter(el,summary); dot.classList.add('done'); btn.textContent='Re-summarise'; btn.disabled=false;
   } catch(e) {
-    clearInterval(thinkInterval);
-    summaryEl.textContent = 'Error: ' + (e.message || 'Could not reach AI. Check connection.');
-    dot.classList.add('done');
-    btn.textContent = '✦ Try Again';
-    btn.disabled = false;
+    clearInterval(t); el.textContent='Error: '+e.message; dot.classList.add('done'); btn.textContent='Try Again'; btn.disabled=false;
   }
 }
 
-function typewriter(el, text) {
-  el.textContent = '';
-  let i = 0;
-  const interval = setInterval(() => {
-    el.textContent += text[i++];
-    if (i >= text.length) clearInterval(interval);
-  }, 12);
-}
+function typewriter(el,text){el.textContent='';var i=0;var iv=setInterval(function(){el.textContent+=text[i++];if(i>=text.length)clearInterval(iv);},12);}
+function resetSummary(){document.getElementById('ai-text').textContent='Click "Summarise" to generate an AI summary of this article.';document.getElementById('summarise-btn').textContent='Summarise with AI';document.getElementById('summarise-btn').disabled=false;document.getElementById('ai-dot').classList.remove('done');}
 
-function resetSummary() {
-  document.getElementById('ai-summary-text').textContent = 'Click "Summarise" to generate an AI summary of this article.';
-  document.getElementById('summarise-btn').textContent = '✦ Summarise with AI';
-  document.getElementById('summarise-btn').disabled = false;
-  document.getElementById('ai-dot').classList.remove('done');
+/* TEXT SIZE MENU */
+function toggleTsMenu(e) {
+  e.stopPropagation();
+  tsOpen = !tsOpen;
+  document.getElementById('ts-menu').classList.toggle('open', tsOpen);
+  document.getElementById('ts-btn').classList.toggle('open', tsOpen);
 }
-
-// ── FONT SIZE ──
-function changeFontSize(delta) {
-  fontSize = Math.max(14, Math.min(28, fontSize + delta));
-  applyFontSize();
-}
-function applyFontSize() {
-  document.getElementById('reader-body').style.fontSize = fontSize + 'px';
-}
-
-// ── STATUS ──
-function setStatus(msg) {
-  document.getElementById('status-text').textContent = msg;
-}
-
-// ── KEYBOARD ──
-document.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
-    e.preventDefault();
-    document.getElementById('url-bar').select();
-  }
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'R') {
-    e.preventDefault();
-    toggleReader();
+document.addEventListener('click', function(e){
+  if (!document.getElementById('ts-wrap').contains(e.target)) {
+    tsOpen=false;
+    document.getElementById('ts-menu').classList.remove('open');
+    document.getElementById('ts-btn').classList.remove('open');
   }
 });
 
-// Quick demo: load a default helpful URL hint
-document.getElementById('url-bar').addEventListener('focus', function() {
-  if (!this.value) this.placeholder = 'Try: https://en.wikipedia.org/wiki/Mindfulness';
+function setPreset(size, btn) {
+  fontSize = size;
+  document.getElementById('font-slider').value = size;
+  document.getElementById('fs-display').textContent = size+'px';
+  document.querySelectorAll('.preset-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  applyBodyStyle();
+}
+function onSlider(val) {
+  fontSize = parseInt(val);
+  document.getElementById('fs-display').textContent = val+'px';
+  document.querySelectorAll('.preset-btn').forEach(function(b){b.classList.remove('active');});
+  applyBodyStyle();
+}
+function setSpacing(val, btn) {
+  lineHeight = val;
+  document.querySelectorAll('.opt-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  applyBodyStyle();
+}
+function setFont(type, btn) {
+  fontFam = type;
+  document.querySelectorAll('.font-pick').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  applyBodyStyle();
+}
+function applyBodyStyle() {
+  var b = document.getElementById('reader-body');
+  b.style.fontSize = fontSize+'px';
+  b.style.lineHeight = lineHeight;
+  var families = {
+    serif:"'Crimson Pro',Georgia,serif",
+    sans:"'Inter',sans-serif",
+    mono:"'Courier New',Courier,monospace"
+  };
+  b.style.fontFamily = families[fontFam] || families.serif;
+}
+
+function setStatus(msg) { document.getElementById('status-text').textContent = msg; }
+
+document.addEventListener('keydown', function(e){
+  if ((e.ctrlKey||e.metaKey)&&e.key==='l') { e.preventDefault(); document.getElementById('url-bar').focus(); document.getElementById('url-bar').select(); }
 });
 </script>
 </body>
